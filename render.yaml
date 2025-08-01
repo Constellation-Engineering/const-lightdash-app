@@ -6,8 +6,14 @@ services:
     healthCheckPath: /api/v1/health
     dockerfilePath: ./Dockerfile
     envVars:
+      # --- Lightdash Base Config ---
       - key: LIGHTDASH_SECRET
         generateValue: true
+      - key: PORT
+        value: 8080
+      - key: NODE_ENV
+        value: production
+      # --- Postgres DB Config (from Render) ---
       - key: PGPASSWORD
         fromDatabase:
           name: lightdash-db
@@ -24,19 +30,15 @@ services:
         fromDatabase:
           name: lightdash-db
           property: database
-      - key: PORT
-        value: 8080
-      - key: LIGHTDASH_INSTALL_TYPE
-        value: RENDER
-      - key: NODE_ENV
-        value: production
-      # The entrypoint script in the Dockerfile will handle migrations and starting the app
-      - key: LIGHTDASH_DBT_PROFILES_DIR
-        value: /tmp/
+      # --- dbt Cloud Project Config ---
       - key: LIGHTDASH_PROJECT_TYPE
-        value: dbt
-      - key: LIGHTDASH_DBT_TARGET
-        value: dev
+        value: dbt_cloud_cli
+      - key: DBT_CLOUD_PROJECT_ID
+        value: "70471823493419"
+      - key: DBT_CLOUD_ENVIRONMENT_ID
+        value: "70471823469537"
+      - key: DBT_CLOUD_API_KEY
+        sync: false # This will be set manually in the Render UI
 
 databases:
   - name: lightdash-db
