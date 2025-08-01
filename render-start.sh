@@ -1,15 +1,14 @@
 #!/bin/bash
-set -e # Exit immediately if a command exits with a non-zero status.
+set -e # Exit immediately if a command fails.
 
-# Add the local node_modules binaries to the PATH
-export PATH="/opt/render/project/src/node_modules/.bin:$PATH"
+# Define the absolute path to the installed binaries
+BIN_DIR="/opt/render/project/src/node_modules/.bin"
 
-# Run the setup and startup commands
 echo "--- Running dbt dependencies ---"
-dbt deps --no-version-check
+$BIN_DIR/dbt deps --no-version-check
 
 echo "--- Running Lightdash database migrations ---"
-dbt-lightdash-v2 migrate
+$BIN_DIR/dbt-lightdash-v2 migrate
 
 echo "--- Starting Lightdash server ---"
-dbt-lightdash-v2 start
+$BIN_DIR/dbt-lightdash-v2 start
