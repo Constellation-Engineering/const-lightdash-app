@@ -30,7 +30,7 @@ services:
         value: RENDER
       - key: NODE_ENV
         value: production
-    startCommand: "./node_modules/.bin/dbt deps --no-version-check && ./node_modules/.bin/dbt-lightdash-v2 migrate && ./node_modules/.bin/dbt-lightdash-v2 start"
+    startCommand: "pnpm exec dbt deps --no-version-check && pnpm exec dbt-lightdash-v2 migrate && pnpm exec dbt-lightdash-v2 start"
 
 databases:
   - name: lightdash-db
