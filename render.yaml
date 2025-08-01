@@ -40,5 +40,5 @@ services:
     startCommand: "dbt-lightdash-v2 start"
 
   - name: db
-    type: psql
+    type: pg
     plan: free
