@@ -2,7 +2,7 @@ services:
   - name: lightdash
     type: web
     env: node
-    plan: standard
+    plan: free
     healthCheckPath: /api/v1/health
     envVars:
       - key: LIGHTDASH_SECRET
