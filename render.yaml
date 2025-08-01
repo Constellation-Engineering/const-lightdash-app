@@ -3,7 +3,7 @@ services:
     type: web
     env: node
     plan: free
-    buildCommand: "corepack enable && yarn install --frozen-lockfile"
+    buildCommand: "corepack enable && pnpm install --frozen-lockfile"
     healthCheckPath: /api/v1/health
     envVars:
       - key: LIGHTDASH_SECRET
