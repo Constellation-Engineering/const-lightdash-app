@@ -30,7 +30,7 @@ services:
         value: RENDER
       - key: NODE_ENV
         value: production
-    startCommand: "pnpm exec dbt deps --no-version-check && pnpm exec dbt-lightdash-v2 migrate && pnpm exec dbt-lightdash-v2 start"
+    startCommand: "export PATH=/opt/render/project/src/node_modules/.bin:$PATH && dbt deps --no-version-check && dbt-lightdash-v2 migrate && dbt-lightdash-v2 start"
 
 databases:
   - name: lightdash-db
