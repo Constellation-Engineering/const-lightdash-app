@@ -29,10 +29,6 @@ services:
         value: RENDER
       - key: NODE_ENV
         value: production
-    preDeployCommand: |-
-      export DATABASE_URL=postgresql://${PGUSER}:${PGPASSWORD}@${PGHOST}/${PGDATABASE}
-      dbt deps --no-version-check
-      dbt-lightdash-v2 migrate
     startCommand: "dbt-lightdash-v2 start"
 
 databases:
