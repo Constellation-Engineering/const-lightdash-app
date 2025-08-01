@@ -1,0 +1,44 @@
+services:
+  - name: lightdash
+    type: web
+    env: node
+    plan: standard
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: LIGHTDASH_SECRET
+        generateValue: true
+      - key: PGPASSWORD
+        fromService:
+          type: psql
+          name: db
+          property: password
+      - key: PGHOST
+        fromService:
+          type: psql
+          name: db
+          property: host
+      - key: PGUSER
+        fromService:
+          type: psql
+          name: db
+          property: user
+      - key: PGDATABASE
+        fromService:
+          type: psql
+          name: db
+          property: database
+      - key: PORT
+        value: 8080
+      - key: LIGHTDASH_INSTALL_TYPE
+        value: RENDER
+      - key: NODE_ENV
+        value: production
+    preDeployCommand: |-
+      export DATABASE_URL=postgresql://${PGUSER}:${PGPASSWORD}@${PGHOST}/${PGDATABASE}
+      dbt deps --no-version-check
+      dbt-lightdash-v2 migrate
+    startCommand: "dbt-lightdash-v2 start"
+
+  - name: db
+    type: psql
+    plan: free
