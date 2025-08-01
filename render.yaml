@@ -8,24 +8,20 @@ services:
       - key: LIGHTDASH_SECRET
         generateValue: true
       - key: PGPASSWORD
-        fromService:
-          type: psql
-          name: db
+        fromDatabase:
+          name: lightdash-db
           property: password
       - key: PGHOST
-        fromService:
-          type: psql
-          name: db
+        fromDatabase:
+          name: lightdash-db
           property: host
       - key: PGUSER
-        fromService:
-          type: psql
-          name: db
+        fromDatabase:
+          name: lightdash-db
           property: user
       - key: PGDATABASE
-        fromService:
-          type: psql
-          name: db
+        fromDatabase:
+          name: lightdash-db
           property: database
       - key: PORT
         value: 8080
@@ -39,6 +35,6 @@ services:
       dbt-lightdash-v2 migrate
     startCommand: "dbt-lightdash-v2 start"
 
-  - name: db
-    type: pg
+databases:
+  - name: lightdash-db
     plan: free
