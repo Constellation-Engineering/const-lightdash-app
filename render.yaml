@@ -1,10 +1,10 @@
 services:
   - name: lightdash
     type: web
-    env: node
+    env: docker
     plan: free
-    buildCommand: "corepack enable && pnpm install --frozen-lockfile"
     healthCheckPath: /api/v1/health
+    dockerfilePath: ./Dockerfile
     envVars:
       - key: LIGHTDASH_SECRET
         generateValue: true
@@ -30,7 +30,13 @@ services:
         value: RENDER
       - key: NODE_ENV
         value: production
-    startCommand: "./render-start.sh"
+      # The entrypoint script in the Dockerfile will handle migrations and starting the app
+      - key: LIGHTDASH_DBT_PROFILES_DIR
+        value: /tmp/
+      - key: LIGHTDASH_PROJECT_TYPE
+        value: dbt
+      - key: LIGHTDASH_DBT_TARGET
+        value: dev
 
 databases:
   - name: lightdash-db
