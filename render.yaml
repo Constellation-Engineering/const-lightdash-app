@@ -29,7 +29,7 @@ services:
         value: RENDER
       - key: NODE_ENV
         value: production
-    startCommand: "dbt-lightdash-v2 start"
+    startCommand: "dbt deps --no-version-check && dbt-lightdash-v2 migrate && dbt-lightdash-v2 start"
 
 databases:
   - name: lightdash-db
