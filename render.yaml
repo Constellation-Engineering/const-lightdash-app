@@ -3,6 +3,7 @@ services:
     type: web
     env: node
     plan: free
+    buildCommand: "yarn install --frozen-lockfile"
     healthCheckPath: /api/v1/health
     envVars:
       - key: LIGHTDASH_SECRET
