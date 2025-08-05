@@ -1,0 +1,5 @@
+# Environment files
+.env*
+
+# But allow .env.example to be tracked
+!.env.example 
