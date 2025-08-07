@@ -68,7 +68,7 @@ const router = sentryCreateBrowserRouter([
 ]);
 const App = () => (
     <>
-        <title>Lightdash</title>
+        <title>Billing Calculator Prototype | Constellation</title>
 
         <ReactQueryProvider>
             <MantineProvider withGlobalStyles withNormalizeCSS withCSSVariables>
