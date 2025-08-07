@@ -1,0 +1,53 @@
+# .github/workflows/deploy.yml
+
+name: Deploy Lightdash to AWS ECS
+
+# This workflow runs on every push to the 'main' branch
+on:
+  push:
+    branches:
+      - main
+
+# These are the environment variables for the workflow
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: billing-calculator-lightdash
+  ECS_CLUSTER_NAME: billing-calculator-lightdash-cluster
+  ECS_SERVICE_NAME: billing-calculator-lightdash-task-service-expd9khb
+
+jobs:
+  deploy:
+    name: Build and Deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Log in to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push Docker image
+        uses: docker/build-and-push-action@v5
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64
+          tags: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      
+      - name: Force new deployment on ECS
+        run: |
+          aws ecs update-service --cluster ${{ env.ECS_CLUSTER_NAME }} --service ${{ env.ECS_SERVICE_NAME }} --force-new-deployment
