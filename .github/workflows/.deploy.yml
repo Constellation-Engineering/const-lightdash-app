@@ -45,8 +45,6 @@ jobs:
           push: true
           platforms: linux/amd64
           tags: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
       
       - name: Force new deployment on ECS
         run: |
