@@ -21,7 +21,7 @@ const AuthPopupResult: FC = () => {
 
     return (
         <>
-            <title>Authentication - Billing Calculator Prototype | Constellation</title>
+            <title>Authentication - Lightdash | Constellation</title>
 
             <Stack>
                 <Image
@@ -60,7 +60,7 @@ export const SuccessAuthPopupResult: FC = () => {
 
     return (
         <>
-            <title>Authentication - Billing Calculator Prototype | Constellation</title>
+            <title>Authentication - Constellation Business Intelligence | Constellation</title>
 
             <Stack>
                 <Image

@@ -82,7 +82,7 @@ const ProjectSettings: FC = () => {
 
     return (
         <>
-            <title>Project Settings - Billing Calculator Prototype | Constellation</title>
+            <title>Project Settings - Lightdash | Constellation</title>
 
             <Stack spacing="xl">
                 <PageBreadcrumbs

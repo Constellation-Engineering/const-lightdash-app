@@ -267,7 +267,7 @@ const Page: FC<React.PropsWithChildren<Props>> = ({
 
     return (
         <>
-            {title ? <title>{`${title} - Billing Calculator Prototype | Constellation`}</title> : null}
+            {title ? <title>{`${title} - Lightdash | Constellation`}</title> : null}
 
             {header}
 
