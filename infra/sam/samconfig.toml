@@ -1,0 +1,11 @@
+version = 0.1
+
+[default.deploy.parameters]
+stack_name = "const-lightdash"
+resolve_s3 = true
+capabilities = "CAPABILITY_NAMED_IAM"
+region = "us-east-1"
+confirm_changeset = false
+fail_on_empty_changeset = true
+parameter_overrides = ["file://infra/sam/parameters/prod.us-east-1.json"]
+
