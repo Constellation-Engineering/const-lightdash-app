@@ -1,0 +1,15 @@
+{
+  "Parameters": {
+    "ProjectName": "const-lightdash",
+    "AwsRegion": "us-east-1",
+    "DomainName": "lightdash.constellationenv.com",
+    "HostedZoneId": "Z123EXAMPLE",
+    "CertificateArn": "arn:aws:acm:us-east-1:<ACCOUNT_ID>:certificate/<CERTIFICATE_UUID>",
+    "EcrRepositoryName": "const-lightdash-app",
+    "DesiredCount": "1",
+    "ContainerCpu": "512",
+    "ContainerMemory": "1024",
+    "GitHubOrg": "<YOUR_GITHUB_ORG_OR_USER>",
+    "GitHubRepo": "const-lightdash-app"
+  }
+}
