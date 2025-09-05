@@ -99,7 +99,7 @@ This project is configured for AWS ECS deployment. The deployment workflow autom
 - Pushes to Amazon ECR
 - Deploys to ECS cluster
 
-See `.github/workflows/.deploy.yml` for deployment configuration.
+See `.github/workflows/deploy.yml` for deployment configuration.
 
 ## Project Structure
 

@@ -1,11 +1,12 @@
 version = 0.1
 
 [default.deploy.parameters]
-stack_name = "const-lightdash"
+stack_name = "const-lightdash-prod"
 resolve_s3 = true
-capabilities = "CAPABILITY_NAMED_IAM"
+s3_prefix = "const-lightdash-prod"
 region = "us-east-1"
-confirm_changeset = false
-fail_on_empty_changeset = true
-parameter_overrides = ["file://infra/sam/parameters/prod.us-east-1.json"]
-
+confirm_changeset = true
+capabilities = "CAPABILITY_NAMED_IAM"
+parameter_overrides = "ProjectName=\"const-lightdash\" AwsRegion=\"us-east-1\" DomainName=\"lightdash.constellationenv.com\" HostedZoneId=\"Z03479473QNRS7M9FR0NX\" CertificateArn=\"arn:aws:acm:us-east-1:671905743573:certificate/3c8580cc-f39e-42c1-b21a-355a43c36d01\" VpcCidr=\"10.20.0.0/16\" PublicSubnet1Cidr=\"10.20.0.0/20\" PublicSubnet2Cidr=\"10.20.16.0/20\" PrivateSubnet1Cidr=\"10.20.128.0/20\" PrivateSubnet2Cidr=\"10.20.144.0/20\" DatabaseName=\"lightdash\" DatabaseEngineVersion=\"14.19\" DatabaseInstanceClass=\"db.t4g.micro\" DatabaseAllocatedStorage=\"20\" ContainerCpu=\"512\" ContainerMemory=\"1024\" ContainerPort=\"8080\" DesiredCount=\"1\" EcrRepositoryName=\"const-lightdash-app\" GitHubOrg=\"constellationenv\" GitHubRepo=\"const-lightdash-app\" ExistingGitHubOidcProviderArn=\"arn:aws:iam::671905743573:oidc-provider/token.actions.githubusercontent.com\" CreateEcrRepository=\"false\""
+image_repositories = []
+profile = "business"
