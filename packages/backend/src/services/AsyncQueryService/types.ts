@@ -1,18 +1,15 @@
 import {
     Account,
     DownloadFileType,
-    GroupByColumn,
     MetricQuery,
     PivotConfig,
-    SortBy,
-    ValuesColumn,
+    PivotConfiguration,
     type CacheMetadata,
     type DashboardFilters,
     type DateZoom,
     type Filters,
     type ItemsMap,
     type ParametersValuesMap,
-    type PivotIndexColum,
     type QueryExecutionContext,
     type ResultColumns,
     type ResultsPaginationArgs,
@@ -54,12 +51,14 @@ export type DownloadAsyncQueryResultsArgs = Omit<
 export type ExecuteAsyncMetricQueryArgs = CommonAsyncQueryArgs & {
     metricQuery: MetricQuery;
     dateZoom?: DateZoom;
+    pivotConfiguration?: PivotConfiguration;
 };
 
 export type ExecuteAsyncSavedChartQueryArgs = CommonAsyncQueryArgs & {
     chartUuid: string;
     versionUuid?: string;
     limit?: number | null | undefined;
+    pivotResults?: boolean;
 };
 
 export type ExecuteAsyncDashboardChartQueryArgs = CommonAsyncQueryArgs & {
@@ -69,6 +68,7 @@ export type ExecuteAsyncDashboardChartQueryArgs = CommonAsyncQueryArgs & {
     dashboardSorts: SortField[];
     dateZoom?: DateZoom;
     limit?: number | null | undefined;
+    pivotResults?: boolean;
 };
 
 export type ExecuteAsyncUnderlyingDataQueryArgs = CommonAsyncQueryArgs & {
@@ -87,12 +87,7 @@ export type ExecuteAsyncQueryReturn = {
 export type ExecuteAsyncSqlQueryArgs = CommonAsyncQueryArgs & {
     sql: string;
     limit?: number;
-    pivotConfiguration?: {
-        indexColumn: PivotIndexColum;
-        valuesColumns: ValuesColumn[];
-        groupByColumns: GroupByColumn[] | undefined;
-        sortBy: SortBy | undefined;
-    };
+    pivotConfiguration?: PivotConfiguration;
 };
 
 export type ExecuteAsyncDashboardSqlChartCommonArgs = CommonAsyncQueryArgs & {
@@ -156,11 +151,6 @@ export type RunAsyncWarehouseQueryArgs = {
         snowflakeVirtualWarehouse?: string;
         databricksCompute?: string;
     };
-    pivotConfiguration?: {
-        indexColumn: PivotIndexColum;
-        valuesColumns: ValuesColumn[];
-        groupByColumns: GroupByColumn[] | undefined;
-        sortBy: SortBy | undefined;
-    };
+    pivotConfiguration?: PivotConfiguration;
     originalColumns?: ResultColumns;
 };

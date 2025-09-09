@@ -1,13 +1,9 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call */
 // This rule is failing in CI but passes locally
-import {
-    ForbiddenError,
-    JWT_HEADER_NAME,
-    NotFoundError,
-    ParameterError,
-} from '@lightdash/common';
+import { JWT_HEADER_NAME, NotFoundError } from '@lightdash/common';
 import { NextFunction, Request, Response } from 'express';
 import { fromJwt } from '../../auth/account';
+import { buildAccountExistsWarning } from '../../auth/account/warnAccountExists';
 import { decodeLightdashJwt } from '../../auth/lightdashJwt';
 import { EmbedService } from '../../ee/services/EmbedService/EmbedService';
 import Logger from '../../logging/logger';
@@ -52,6 +48,10 @@ export async function jwtAuthMiddleware(
         // There are some situations where we'll already have a user and need to still create a
         // JWT account. One example is when an admin is previewing an embed URL.
         if (req.account?.isAuthenticated()) {
+            Logger.warn(
+                buildAccountExistsWarning('JWT Middleware'),
+                req.account?.authentication?.type,
+            );
             next();
             return;
         }
@@ -87,11 +87,13 @@ export async function jwtAuthMiddleware(
         }
 
         // Get embed configuration from database
-        const { encodedSecret, organization } =
-            await embedService.getEmbeddingByProjectId(projectUuid);
-        const decodedToken = decodeLightdashJwt(embedToken, encodedSecret);
+        const embed = await embedService.getEmbeddingByProjectId(projectUuid);
+        const decodedToken = decodeLightdashJwt(
+            embedToken,
+            embed.encodedSecret,
+        );
         const userAttributesPromise = embedService.getEmbedUserAttributes(
-            organization.organizationUuid,
+            embed.organization.organizationUuid,
             decodedToken,
         );
         const dashboardUuidPromise = embedService.getDashboardUuidFromJwt(
@@ -114,7 +116,7 @@ export async function jwtAuthMiddleware(
         req.account = fromJwt({
             decodedToken,
             source: embedToken,
-            organization,
+            embed,
             dashboardUuid,
             userAttributes,
         });

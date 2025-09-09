@@ -2,8 +2,6 @@ import {
     AgentToolCallArgsSchema,
     type AiAgentToolCall,
     AiResultType,
-    type ApiCompiledQueryResults,
-    type ApiExecuteAsyncMetricQueryResults,
     assertUnreachable,
     TOOL_DISPLAY_MESSAGES,
     TOOL_DISPLAY_MESSAGES_AFTER_TOOL_CALL,
@@ -27,15 +25,16 @@ import {
     IconChartDots3,
     IconChartHistogram,
     IconChartLine,
+    IconDashboard,
     IconDatabase,
     IconSearch,
     IconSelector,
     IconTable,
+    IconTools,
     type TablerIconsProps,
 } from '@tabler/icons-react';
 import { type FC, type JSX } from 'react';
 import MantineIcon from '../../../../../../components/common/MantineIcon';
-import { useCompiledSqlFromMetricQuery } from '../../../../../../hooks/useCompiledSql';
 import { AiChartGenerationToolCallDescription } from './AiChartGenerationToolCallDescription';
 
 const getToolIcon = (toolName: ToolName) => {
@@ -46,6 +45,8 @@ const getToolIcon = (toolName: ToolName) => {
             generateBarVizConfig: IconChartHistogram,
             generateTimeSeriesVizConfig: IconChartLine,
             generateTableVizConfig: IconTable,
+            findDashboards: IconDashboard,
+            findCharts: IconChartDots3,
         };
 
     return iconMap[toolName];
@@ -69,25 +70,26 @@ const ToolCallContainer = ({
     return (
         <Paper
             withBorder
-            p="sm"
+            p="xs"
             radius="md"
             style={{ borderStyle: 'dashed' }}
             // default shadow is subtler than the ones we can set
             shadow={opened ? 'none' : undefined}
         >
-            <UnstyledButton onClick={toggle} w="100%" h="22px">
+            <UnstyledButton onClick={toggle} w="100%" h="18px">
                 <Group justify="space-between" w="100%" h="100%">
                     <Group gap="xs">
                         <MantineIcon
-                            icon={IconChartDots3}
-                            size={14}
-                            color="gray"
+                            icon={IconTools}
+                            size="sm"
+                            strokeWidth={1.2}
+                            color="gray.6"
                         />
-                        <Title order={6} c="dimmed" tt="uppercase" size="xs">
+                        <Title order={6} c="gray.6" size="xs">
                             How it is calculated
                         </Title>
                     </Group>
-                    <MantineIcon icon={IconSelector} size={14} color="gray" />
+                    <MantineIcon icon={IconSelector} size={12} color="gray.6" />
                 </Group>
             </UnstyledButton>
             <Collapse in={opened}>{children}</Collapse>
@@ -97,8 +99,7 @@ const ToolCallContainer = ({
 
 const ToolCallDescription: FC<{
     toolCall: ToolCallSummary;
-    compiledSql: ApiCompiledQueryResults | undefined;
-}> = ({ toolCall, compiledSql }) => {
+}> = ({ toolCall }) => {
     const toolNameParsed = ToolNameSchema.safeParse(toolCall.toolName);
     const toolArgsParsed = AgentToolCallArgsSchema.safeParse(toolCall.toolArgs);
 
@@ -153,7 +154,6 @@ const ToolCallDescription: FC<{
                     breakdownByDimension={
                         barVizConfigToolArgs.vizConfig.breakdownByDimension
                     }
-                    sql={compiledSql?.query}
                 />
             );
         case AiResultType.TABLE_RESULT:
@@ -165,7 +165,6 @@ const ToolCallDescription: FC<{
                         tableVizConfigToolArgs.vizConfig.dimensions ?? []
                     }
                     metrics={tableVizConfigToolArgs.vizConfig.metrics}
-                    sql={compiledSql?.query}
                 />
             );
         case AiResultType.TIME_SERIES_RESULT:
@@ -178,8 +177,55 @@ const ToolCallDescription: FC<{
                     breakdownByDimension={
                         timeSeriesToolCallArgs.vizConfig.breakdownByDimension
                     }
-                    sql={compiledSql?.query}
                 />
+            );
+        case 'find_dashboards':
+            const findDashboardsToolArgs = toolArgs;
+            return (
+                <Text c="dimmed" size="xs">
+                    Searched for dashboards{' '}
+                    {findDashboardsToolArgs.dashboardSearchQueries.map(
+                        (query) => (
+                            <Badge
+                                key={query.label}
+                                color="gray"
+                                variant="light"
+                                size="xs"
+                                mx={rem(2)}
+                                radius="sm"
+                                style={{
+                                    textTransform: 'none',
+                                    fontWeight: 400,
+                                }}
+                            >
+                                {query.label}
+                            </Badge>
+                        ),
+                    )}
+                </Text>
+            );
+        case 'find_charts':
+            const findChartsToolArgs = toolArgs;
+            return (
+                <Text c="dimmed" size="xs">
+                    Searched for charts{' '}
+                    {findChartsToolArgs.chartSearchQueries.map((query) => (
+                        <Badge
+                            key={query.label}
+                            color="gray"
+                            variant="light"
+                            size="xs"
+                            mx={rem(2)}
+                            radius="sm"
+                            style={{
+                                textTransform: 'none',
+                                fontWeight: 400,
+                            }}
+                        >
+                            {query.label}
+                        </Badge>
+                    ))}
+                </Text>
             );
         default:
             return assertUnreachable(toolArgs, `Unknown tool name ${toolName}`);
@@ -189,23 +235,12 @@ const ToolCallDescription: FC<{
 type AiChartToolCallsProps = {
     toolCalls: ToolCallSummary[] | undefined;
     type: ToolCallDisplayType;
-    compiledSql?: ApiCompiledQueryResults;
-    metricQuery?: ApiExecuteAsyncMetricQueryResults['metricQuery'];
-    projectUuid?: string;
 };
 
 export const AiChartToolCalls: FC<AiChartToolCallsProps> = ({
     toolCalls,
     type,
-    metricQuery,
-    projectUuid,
 }) => {
-    const { data: compiledSql } = useCompiledSqlFromMetricQuery({
-        tableName: metricQuery?.exploreName,
-        projectUuid,
-        metricQuery: metricQuery,
-    });
-
     const texts =
         type === 'streaming'
             ? TOOL_DISPLAY_MESSAGES
@@ -214,12 +249,12 @@ export const AiChartToolCalls: FC<AiChartToolCallsProps> = ({
     if (!toolCalls || toolCalls.length === 0) return null;
     return (
         <ToolCallContainer defaultOpened={type !== 'persisted'}>
-            <Stack pt="sm">
+            <Stack pt="xs">
                 <Timeline
                     active={toolCalls.length - 1}
-                    bulletSize={20}
-                    lineWidth={2}
-                    color="indigo.6"
+                    bulletSize={16}
+                    lineWidth={1}
+                    color="gray"
                 >
                     {toolCalls.map((toolCall) => {
                         const toolNameParsed = ToolNameSchema.safeParse(
@@ -235,29 +270,31 @@ export const AiChartToolCalls: FC<AiChartToolCallsProps> = ({
                         return (
                             <Timeline.Item
                                 key={toolCall.toolCallId}
-                                radius="md"
+                                radius="sm"
                                 bullet={
-                                    <MantineIcon
-                                        icon={IconComponent}
-                                        size={12}
-                                        stroke={1.5}
-                                    />
+                                    <Paper
+                                        bg="white"
+                                        p="two"
+                                        radius="sm"
+                                        shadow="subtle"
+                                    >
+                                        <MantineIcon
+                                            icon={IconComponent}
+                                            size={12}
+                                            stroke={1.8}
+                                            color="indigo.3"
+                                        />
+                                    </Paper>
                                 }
+                                mt="xs"
                                 title={
-                                    <Text fw={500} size="sm">
+                                    <Text fw={400} size="xs" c="gray.7">
                                         {texts[toolName]}
                                     </Text>
                                 }
-                                lineVariant={'solid'}
+                                lineVariant={'dashed'}
                             >
-                                <ToolCallDescription
-                                    toolCall={toolCall}
-                                    compiledSql={
-                                        type === 'persisted'
-                                            ? compiledSql
-                                            : undefined
-                                    }
-                                />
+                                <ToolCallDescription toolCall={toolCall} />
                             </Timeline.Item>
                         );
                     })}

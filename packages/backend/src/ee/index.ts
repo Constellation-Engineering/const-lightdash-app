@@ -3,9 +3,11 @@ import express, { Express } from 'express';
 import { AppArguments } from '../App';
 import { lightdashConfig } from '../config/lightdashConfig';
 import Logger from '../logging/logger';
+import { McpContextModel } from '../models/McpContextModel';
 import { AsyncQueryService } from '../services/AsyncQueryService/AsyncQueryService';
 import { InstanceConfigurationService } from '../services/InstanceConfigurationService/InstanceConfigurationService';
 import { ProjectService } from '../services/ProjectService/ProjectService';
+import { RolesService } from '../services/RolesService/RolesService';
 import { EncryptionUtil } from '../utils/EncryptionUtil/EncryptionUtil';
 import LicenseClient from './clients/License/LicenseClient';
 import OpenAi from './clients/OpenAi';
@@ -18,6 +20,7 @@ import { EmbedModel } from './models/EmbedModel';
 import { ServiceAccountModel } from './models/ServiceAccountModel';
 import { CommercialSchedulerClient } from './scheduler/SchedulerClient';
 import { CommercialSchedulerWorker } from './scheduler/SchedulerWorker';
+import { AiAgentAdminService } from './services/AiAgentAdminService';
 import { AiAgentService } from './services/AiAgentService';
 import { AiService } from './services/AiService/AiService';
 import { CommercialCacheService } from './services/CommercialCacheService';
@@ -26,6 +29,7 @@ import { EmbedService } from './services/EmbedService/EmbedService';
 import { McpService } from './services/McpService/McpService';
 import { ScimService } from './services/ScimService/ScimService';
 import { ServiceAccountService } from './services/ServiceAccountService/ServiceAccountService';
+import { CommercialSlackService } from './services/SlackService/SlackService';
 import { SupportService } from './services/SupportService/SupportService';
 
 type EnterpriseAppArguments = Pick<
@@ -35,7 +39,6 @@ type EnterpriseAppArguments = Pick<
     | 'serviceProviders'
     | 'modelProviders'
     | 'customExpressMiddlewares'
-    | 'slackClientFactory'
 >;
 
 export async function getEnterpriseAppArguments(): Promise<EnterpriseAppArguments> {
@@ -96,6 +99,18 @@ export async function getEnterpriseAppArguments(): Promise<EnterpriseAppArgument
                     catalogService: repository.getCatalogService(),
                     asyncQueryService: repository.getAsyncQueryService(),
                     userAttributesModel: models.getUserAttributesModel(),
+                    searchModel: models.getSearchModel(),
+                    spaceModel: models.getSpaceModel(),
+                    slackAuthenticationModel:
+                        models.getSlackAuthenticationModel() as CommercialSlackAuthenticationModel,
+                    schedulerClient:
+                        clients.getSchedulerClient() as CommercialSchedulerClient,
+                    openIdIdentityModel: models.getOpenIdIdentityModel(),
+                    spaceService: repository.getSpaceService(),
+                }),
+            aiAgentAdminService: ({ models }) =>
+                new AiAgentAdminService({
+                    aiAgentModel: models.getAiAgentModel(),
                 }),
             scimService: ({ models, context }) =>
                 new ScimService({
@@ -237,14 +252,31 @@ export async function getEnterpriseAppArguments(): Promise<EnterpriseAppArgument
                     lightdashConfig: context.lightdashConfig,
                     storageClient: clients.getResultsFileStorageClient(),
                 }),
-            mcpService: ({ context }) =>
+            mcpService: ({ context, repository, models }) =>
                 new McpService({
                     lightdashConfig: context.lightdashConfig,
+                    analytics: context.lightdashAnalytics,
+                    catalogService: repository.getCatalogService(),
+                    projectService: repository.getProjectService(),
+                    userAttributesModel: models.getUserAttributesModel(),
+                    searchModel: models.getSearchModel(),
+                    spaceModel: models.getSpaceModel(),
+                    spaceService: repository.getSpaceService(),
+                    mcpContextModel: models.getMcpContextModel(),
+                    projectModel: models.getProjectModel(),
+                    featureFlagService: repository.getFeatureFlagService(),
+                }),
+            slackService: ({ repository, clients }) =>
+                new CommercialSlackService({
+                    slackClient: clients.getSlackClient(),
+                    unfurlService: repository.getUnfurlService(),
+                    aiAgentService: repository.getAiAgentService(),
                 }),
         },
         modelProviders: {
             aiAgentModel: ({ database }) => new AiAgentModel({ database }),
             embedModel: ({ database }) => new EmbedModel({ database }),
+            mcpContextModel: ({ database }) => new McpContextModel(database),
             dashboardSummaryModel: ({ database }) =>
                 new DashboardSummaryModel({ database }),
             slackAuthenticationModel: ({ database }) =>
@@ -268,6 +300,7 @@ export async function getEnterpriseAppArguments(): Promise<EnterpriseAppArgument
             new CommercialSchedulerWorker({
                 lightdashConfig: context.lightdashConfig,
                 analytics: context.analytics,
+                slackClient: context.clients.getSlackClient(),
                 unfurlService: context.serviceRepository.getUnfurlService(),
                 csvService: context.serviceRepository.getCsvService(),
                 dashboardService:
@@ -282,7 +315,6 @@ export async function getEnterpriseAppArguments(): Promise<EnterpriseAppArgument
                 googleDriveClient: context.clients.getGoogleDriveClient(),
                 s3Client: context.clients.getS3Client(),
                 schedulerClient: context.clients.getSchedulerClient(),
-                slackClient: context.clients.getSlackClient(),
                 aiAgentService: context.serviceRepository.getAiAgentService(),
                 catalogService: context.serviceRepository.getCatalogService(),
                 encryptionUtil: context.utils.getEncryptionUtil(),
@@ -291,18 +323,6 @@ export async function getEnterpriseAppArguments(): Promise<EnterpriseAppArgument
                 asyncQueryService:
                     context.serviceRepository.getAsyncQueryService(),
             }),
-        slackClientFactory: (context) =>
-            new CommercialSlackClient({
-                lightdashConfig: context.lightdashConfig,
-                analytics: context.analytics,
-                slackAuthenticationModel:
-                    context.models.getSlackAuthenticationModel() as CommercialSlackAuthenticationModel,
-                schedulerClient:
-                    context.clients.getSchedulerClient() as CommercialSchedulerClient,
-                aiAgentModel: context.models.getAiAgentModel(),
-                openIdIdentityModel: context.models.getOpenIdIdentityModel(),
-                userModel: context.models.getUserModel(),
-            }),
         clientProviders: {
             schedulerClient: ({ context, models }) =>
                 new CommercialSchedulerClient({
@@ -310,17 +330,12 @@ export async function getEnterpriseAppArguments(): Promise<EnterpriseAppArgument
                     analytics: context.lightdashAnalytics,
                     schedulerModel: models.getSchedulerModel(),
                 }),
-            slackClient: ({ context, models, repository }) =>
+            slackClient: ({ context, models }) =>
                 new CommercialSlackClient({
                     analytics: context.lightdashAnalytics,
                     lightdashConfig: context.lightdashConfig,
                     slackAuthenticationModel:
                         models.getSlackAuthenticationModel() as CommercialSlackAuthenticationModel,
-                    schedulerClient:
-                        repository.getSchedulerClient() as CommercialSchedulerClient,
-                    aiAgentModel: models.getAiAgentModel(),
-                    openIdIdentityModel: models.getOpenIdIdentityModel(),
-                    userModel: models.getUserModel(),
                 }),
         },
     };

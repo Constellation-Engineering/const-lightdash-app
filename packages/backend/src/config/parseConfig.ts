@@ -40,15 +40,11 @@ import {
 
 enum TokenEnvironmentVariable {
     SERVICE_ACCOUNT = 'LD_SETUP_SERVICE_ACCOUNT_TOKEN',
-    PERSONAL_ACCESS_TOKEN = 'LD_SETUP_PROJECT_PAT',
 }
 
 const tokenConfigs = {
     [TokenEnvironmentVariable.SERVICE_ACCOUNT]: {
         prefix: AuthTokenPrefix.SERVICE_ACCOUNT,
-    },
-    [TokenEnvironmentVariable.PERSONAL_ACCESS_TOKEN]: {
-        prefix: AuthTokenPrefix.PERSONAL_ACCESS_TOKEN,
     },
 };
 
@@ -245,7 +241,13 @@ export const getPemFileContent = (certValue: string | undefined) =>
         decodeUnlessStartsWith: '-----BEGIN ', // -----BEGIN CERTIFICATE | -----BEGIN PRIVATE KEY
     });
 
-type LoggingLevel = 'error' | 'warn' | 'info' | 'http' | 'debug' | 'audit';
+export type LoggingLevel =
+    | 'error'
+    | 'warn'
+    | 'info'
+    | 'http'
+    | 'debug'
+    | 'audit';
 const assertIsLoggingLevel = (x: string): x is LoggingLevel =>
     ['error', 'warn', 'info', 'http', 'debug', 'audit'].includes(x);
 const parseLoggingLevel = (raw: string): LoggingLevel => {
@@ -331,13 +333,23 @@ const getInitialSetupConfig = (): LightdashConfig['initialSetup'] => {
     try {
         if (!process.env.LD_SETUP_ADMIN_EMAIL) return undefined;
 
+        const projectPat = process.env.LD_SETUP_PROJECT_PAT;
+        if (!projectPat) {
+            throw new ParameterError(
+                `LD_SETUP_PROJECT_PAT is required for initial setup`,
+                { variant: 'ApiToken' },
+            );
+        }
+
         return {
             organization: {
                 admin: {
                     name: process.env.LD_SETUP_ADMIN_NAME || 'Admin User',
                     email: process.env.LD_SETUP_ADMIN_EMAIL!,
                 },
-                emailDomain: process.env.LD_SETUP_ORGANIZATION_EMAIL_DOMAIN,
+                emailDomains: getArrayFromCommaSeparatedList(
+                    'LD_SETUP_ORGANIZATION_EMAIL_DOMAIN',
+                ),
                 defaultRole:
                     parseEnum<AllowedEmailDomainsRole>(
                         process.env.LD_SETUP_ORGANIZATION_DEFAULT_ROLE,
@@ -371,9 +383,7 @@ const getInitialSetupConfig = (): LightdashConfig['initialSetup'] => {
                 database: process.env.LD_SETUP_PROJECT_SCHEMA!,
                 serverHostName: process.env.LD_SETUP_PROJECT_HOST!,
                 httpPath: process.env.LD_SETUP_PROJECT_HTTP_PATH!,
-                personalAccessToken: isApiValidToken(
-                    TokenEnvironmentVariable.PERSONAL_ACCESS_TOKEN,
-                )?.value!,
+                personalAccessToken: projectPat,
                 requireUserCredentials: undefined,
                 startOfWeek: parseEnum<WeekDay>(
                     process.env.LD_SETUP_START_OF_WEEK,
@@ -403,7 +413,10 @@ const getInitialSetupConfig = (): LightdashConfig['initialSetup'] => {
         // Unless it's related to API tokens, in which case we throw an error to get
         // a proper token. Otherwise, the CLI will not work and the app will be in a state
         // that needs to be recovered.
-        if (e instanceof ParseError && e.data.variant === 'ApiToken') {
+        if (
+            (e instanceof ParseError && e.data.variant === 'ApiToken') ||
+            (e instanceof ParameterError && e.data.variant === 'ApiToken')
+        ) {
             throw e;
         }
 
@@ -431,7 +444,9 @@ export const getUpdateSetupConfig = (): LightdashConfig['updateSetup'] => {
             admin: {
                 email: process.env.LD_SETUP_ADMIN_EMAIL,
             },
-            emailDomain: process.env.LD_SETUP_ORGANIZATION_EMAIL_DOMAIN,
+            emailDomains: getArrayFromCommaSeparatedList(
+                'LD_SETUP_ORGANIZATION_EMAIL_DOMAIN',
+            ),
             defaultRole: parseEnum<AllowedEmailDomainsRole>(
                 process.env.LD_SETUP_ORGANIZATION_DEFAULT_ROLE,
                 AllowedEmailDomainsRoles,
@@ -447,6 +462,7 @@ export const getUpdateSetupConfig = (): LightdashConfig['updateSetup'] => {
                 process.env.LD_SETUP_DBT_VERSION,
                 SupportedDbtVersions,
             ),
+            personalAccessToken: process.env.LD_SETUP_PROJECT_PAT,
         },
         serviceAccount: isApiValidToken(
             TokenEnvironmentVariable.SERVICE_ACCOUNT,
@@ -674,7 +690,7 @@ export type LightdashConfig = {
         csvCellsLimit: number;
         timezone: string | undefined;
         maxPageSize: number;
-        showQueryWarnings: boolean;
+        useSqlPivotResults: boolean;
     };
     pivotTable: {
         maxColumnLimit: number;
@@ -704,6 +720,16 @@ export type LightdashConfig = {
         jobTimeout: number;
         screenshotTimeout?: number;
         tasks: Array<SchedulerTaskName>;
+        queryHistory: {
+            cleanup: {
+                enabled: boolean;
+                retentionDays: number;
+                batchSize: number;
+                delayMs: number;
+                maxBatches?: number;
+                schedule: string;
+            };
+        };
     };
     groups: {
         enabled: boolean;
@@ -744,7 +770,7 @@ export type LightdashConfig = {
                 email: string;
                 name: string;
             };
-            emailDomain?: string;
+            emailDomains: string[];
             name: string;
             defaultRole: AllowedEmailDomainsRole;
         };
@@ -767,7 +793,7 @@ export type LightdashConfig = {
             admin: {
                 email?: string;
             };
-            emailDomain?: string;
+            emailDomains: string[];
             defaultRole?: AllowedEmailDomainsRole;
         };
         apiKey: {
@@ -780,6 +806,7 @@ export type LightdashConfig = {
         project: {
             httpPath?: CreateDatabricksCredentials['httpPath'];
             dbtVersion?: DbtVersionOption;
+            personalAccessToken?: CreateDatabricksCredentials['personalAccessToken'];
         };
         serviceAccount?: {
             token: string;
@@ -787,6 +814,9 @@ export type LightdashConfig = {
         };
     };
     mcp: {
+        enabled: boolean;
+    };
+    customRoles: {
         enabled: boolean;
     };
 };
@@ -1021,6 +1051,7 @@ export const parseConfig = (): LightdashConfig => {
         telemetryEnabled: process.env.AI_COPILOT_TELEMETRY_ENABLED === 'true',
         requiresFeatureFlag:
             process.env.AI_COPILOT_REQUIRES_FEATURE_FLAG === 'true',
+        askAiButtonEnabled: process.env.ASK_AI_BUTTON_ENABLED === 'true',
         defaultProvider:
             process.env.AI_DEFAULT_PROVIDER || DEFAULT_DEFAULT_AI_PROVIDER,
         providers: {
@@ -1030,6 +1061,9 @@ export const parseConfig = (): LightdashConfig => {
                       apiKey: process.env.AZURE_AI_API_KEY,
                       apiVersion: process.env.AZURE_AI_API_VERSION,
                       deploymentName: process.env.AZURE_AI_DEPLOYMENT_NAME,
+                      temperature: getFloatFromEnvironmentVariable(
+                          'AZURE_AI_TEMPERATURE',
+                      ),
                   }
                 : undefined,
             openai: process.env.OPENAI_API_KEY
@@ -1039,6 +1073,8 @@ export const parseConfig = (): LightdashConfig => {
                           process.env.OPENAI_MODEL_NAME ||
                           DEFAULT_OPENAI_MODEL_NAME,
                       baseUrl: process.env.OPENAI_BASE_URL,
+                      temperature:
+                          getFloatFromEnvironmentVariable('OPENAI_TEMPERATURE'),
                   }
                 : undefined,
             anthropic: process.env.ANTHROPIC_API_KEY
@@ -1047,6 +1083,9 @@ export const parseConfig = (): LightdashConfig => {
                       modelName:
                           process.env.ANTHROPIC_MODEL_NAME ||
                           DEFAULT_ANTHROPIC_MODEL_NAME,
+                      temperature: getFloatFromEnvironmentVariable(
+                          'ANTHROPIC_TEMPERATURE',
+                      ),
                   }
                 : undefined,
             openrouter: process.env.OPENROUTER_API_KEY
@@ -1058,6 +1097,9 @@ export const parseConfig = (): LightdashConfig => {
                       sortOrder: process.env.OPENROUTER_SORT_ORDER,
                       allowedProviders: getArrayFromCommaSeparatedList(
                           'OPENROUTER_ALLOWED_PROVIDERS',
+                      ),
+                      temperature: getFloatFromEnvironmentVariable(
+                          'OPENROUTER_TEMPERATURE',
                       ),
                   }
                 : undefined,
@@ -1353,8 +1395,7 @@ export const parseConfig = (): LightdashConfig => {
                 getIntegerFromEnvironmentVariable(
                     'LIGHTDASH_QUERY_MAX_PAGE_SIZE',
                 ) || 2500, // Defaults to default limit * 5
-            showQueryWarnings:
-                process.env.LIGHTDASH_SHOW_QUERY_WARNINGS === 'true',
+            useSqlPivotResults: process.env.USE_SQL_PIVOT_RESULTS === 'true',
         },
         chart: {
             versionHistory: {
@@ -1412,6 +1453,31 @@ export const parseConfig = (): LightdashConfig => {
                 ? parseInt(process.env.SCHEDULER_SCREENSHOT_TIMEOUT, 10)
                 : undefined,
             tasks: parseAndSanitizeSchedulerTasks(),
+            queryHistory: {
+                cleanup: {
+                    enabled:
+                        process.env.QUERY_HISTORY_CLEANUP_ENABLED !== 'false', // true by default
+                    retentionDays:
+                        getIntegerFromEnvironmentVariable(
+                            'QUERY_HISTORY_RETENTION_DAYS',
+                        ) || 30,
+                    batchSize:
+                        getIntegerFromEnvironmentVariable(
+                            'QUERY_HISTORY_CLEANUP_BATCH_SIZE',
+                        ) || 1000,
+                    delayMs:
+                        getIntegerFromEnvironmentVariable(
+                            'QUERY_HISTORY_CLEANUP_DELAY_MS',
+                        ) || 100,
+                    maxBatches:
+                        getIntegerFromEnvironmentVariable(
+                            'QUERY_HISTORY_CLEANUP_MAX_BATCHES',
+                        ) || 100,
+                    schedule:
+                        process.env.QUERY_HISTORY_CLEANUP_SCHEDULE ||
+                        '0 2 * * *',
+                },
+            },
         },
         groups: {
             enabled: process.env.GROUPS_ENABLED === 'true',
@@ -1495,6 +1561,9 @@ export const parseConfig = (): LightdashConfig => {
         updateSetup: getUpdateSetupConfig(),
         mcp: {
             enabled: process.env.MCP_ENABLED === 'true',
+        },
+        customRoles: {
+            enabled: process.env.CUSTOM_ROLES_ENABLED === 'true',
         },
     };
 };

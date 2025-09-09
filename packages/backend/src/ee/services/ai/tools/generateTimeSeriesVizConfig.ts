@@ -1,11 +1,14 @@
 import {
+    Explore,
     getTotalFilterRules,
     isSlackPrompt,
     toolTimeSeriesArgsSchema,
     toolTimeSeriesArgsSchemaTransformed,
+    ToolTimeSeriesArgsTransformed,
 } from '@lightdash/common';
 import { tool } from 'ai';
 import type {
+    CreateOrUpdateArtifactFn,
     GetExploreFn,
     GetPromptFn,
     RunMiniMetricQueryFn,
@@ -16,8 +19,11 @@ import type {
 import { renderEcharts } from '../utils/renderEcharts';
 import { toolErrorHandler } from '../utils/toolErrorHandler';
 import {
+    validateCustomMetricsDefinition,
     validateFilterRules,
+    validateMetricDimensionFilterPlacement,
     validateSelectedFieldsExistence,
+    validateSortFieldsAreSelected,
 } from '../utils/validators';
 import { renderTimeSeriesViz } from '../visualizations/vizTimeSeries';
 
@@ -28,6 +34,7 @@ type Dependencies = {
     getPrompt: GetPromptFn;
     updatePrompt: UpdatePromptFn;
     sendFile: SendFileFn;
+    createOrUpdateArtifact: CreateOrUpdateArtifactFn;
     maxLimit: number;
 };
 export const getGenerateTimeSeriesVizConfig = ({
@@ -37,12 +44,53 @@ export const getGenerateTimeSeriesVizConfig = ({
     getPrompt,
     sendFile,
     updatePrompt,
+    createOrUpdateArtifact,
     maxLimit,
 }: Dependencies) => {
     const schema = toolTimeSeriesArgsSchema;
 
+    /**
+     * This function is used to validate the viz tool.
+     * @param vizTool - The complete viz tool with populated custom fields
+     * @param explore - The explore
+     */
+    const validateVizTool = (
+        vizTool: ToolTimeSeriesArgsTransformed,
+        explore: Explore,
+    ) => {
+        const filterRules = getTotalFilterRules(vizTool.filters);
+        const fieldsToValidate = [
+            vizTool.vizConfig.xDimension,
+            vizTool.vizConfig.breakdownByDimension,
+            ...vizTool.vizConfig.yMetrics,
+            ...vizTool.vizConfig.sorts.map((sortField) => sortField.fieldId),
+        ].filter((x) => typeof x === 'string');
+        validateSelectedFieldsExistence(
+            explore,
+            fieldsToValidate,
+            vizTool.customMetrics,
+        );
+        validateCustomMetricsDefinition(explore, vizTool.customMetrics);
+        validateFilterRules(explore, filterRules, vizTool.customMetrics);
+        validateMetricDimensionFilterPlacement(
+            explore,
+            vizTool.filters,
+            vizTool.customMetrics,
+        );
+        const selectedDimensions = [
+            vizTool.vizConfig.xDimension,
+            vizTool.vizConfig.breakdownByDimension,
+        ].filter((x) => typeof x === 'string');
+        validateSortFieldsAreSelected(
+            vizTool.vizConfig.sorts,
+            selectedDimensions,
+            vizTool.vizConfig.yMetrics,
+            vizTool.customMetrics,
+        );
+    };
+
     return tool({
-        description: `Use this tool to generate a Time Series Chart.`,
+        description: toolTimeSeriesArgsSchema.description,
         parameters: schema,
         execute: async (toolArgs) => {
             try {
@@ -51,24 +99,25 @@ export const getGenerateTimeSeriesVizConfig = ({
                 // TODO: common for all viz tools. find a way to reuse this code.
                 const vizTool =
                     toolTimeSeriesArgsSchemaTransformed.parse(toolArgs);
-
-                const filterRules = getTotalFilterRules(vizTool.filters);
                 const explore = await getExplore({
                     exploreName: vizTool.vizConfig.exploreName,
                 });
-                const fieldsToValidate = [
-                    vizTool.vizConfig.xDimension,
-                    vizTool.vizConfig.breakdownByDimension,
-                    ...vizTool.vizConfig.yMetrics,
-                    ...vizTool.vizConfig.sorts.map(
-                        (sortField) => sortField.fieldId,
-                    ),
-                ].filter((x) => typeof x === 'string');
-                validateSelectedFieldsExistence(explore, fieldsToValidate);
-                validateFilterRules(explore, filterRules);
+                validateVizTool(vizTool, explore);
                 // end of TODO
 
                 const prompt = await getPrompt();
+
+                // Create or update artifact
+                await createOrUpdateArtifact({
+                    threadUuid: prompt.threadUuid,
+                    promptUuid: prompt.promptUuid,
+                    artifactType: 'chart',
+                    title: toolArgs.title,
+                    description: toolArgs.description,
+                    vizConfig: toolArgs,
+                });
+
+                // TODO :: keeping this for now, until the front-end is under feature-flag
                 await updatePrompt({
                     promptUuid: prompt.promptUuid,
                     vizConfigOutput: toolArgs,

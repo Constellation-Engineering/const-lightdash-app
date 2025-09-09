@@ -33,12 +33,14 @@ import { ProjectParametersService } from './ProjectParametersService';
 import { ProjectService } from './ProjectService/ProjectService';
 import { PromoteService } from './PromoteService/PromoteService';
 import { RenameService } from './RenameService/RenameService';
+import { RolesService } from './RolesService/RolesService';
 import { SavedChartService } from './SavedChartsService/SavedChartService';
 import { SavedSqlService } from './SavedSqlService/SavedSqlService';
 import { SchedulerService } from './SchedulerService/SchedulerService';
 import { SearchService } from './SearchService/SearchService';
 import { ShareService } from './ShareService/ShareService';
 import { SlackIntegrationService } from './SlackIntegrationService/SlackIntegrationService';
+import { SlackService } from './SlackService/SlackService';
 import { SpaceService } from './SpaceService/SpaceService';
 import { SpotlightService } from './SpotlightService/SpotlightService';
 import { SshKeyPairService } from './SshKeyPairService';
@@ -97,12 +99,15 @@ interface ServiceManifest {
     embedService: unknown;
     aiService: unknown;
     aiAgentService: unknown;
+    aiAgentAdminService: unknown;
     scimService: unknown;
     supportService: unknown;
     cacheService: unknown;
     serviceAccountService: unknown;
     instanceConfigurationService: unknown;
     mcpService: unknown;
+    rolesService: RolesService;
+    slackService: SlackService;
 }
 
 /**
@@ -674,6 +679,10 @@ export class ServiceRepository
                     s3Client: this.clients.getS3Client(),
                     projectModel: this.models.getProjectModel(),
                     downloadFileModel: this.models.getDownloadFileModel(),
+                    slackClient: this.clients.getSlackClient(),
+                    analytics: this.context.lightdashAnalytics,
+                    slackAuthenticationModel:
+                        this.models.getSlackAuthenticationModel(),
                 }),
         );
     }
@@ -871,6 +880,29 @@ export class ServiceRepository
         return this.getService('aiAgentService');
     }
 
+    public getAiAgentAdminService<
+        AiAgentAdminServiceImplT,
+    >(): AiAgentAdminServiceImplT {
+        return this.getService('aiAgentAdminService');
+    }
+
+    public getRolesService(): RolesService {
+        return this.getService(
+            'rolesService',
+            () =>
+                new RolesService({
+                    lightdashConfig: this.context.lightdashConfig,
+                    analytics: this.context.lightdashAnalytics,
+                    rolesModel: this.models.getRolesModel(),
+                    userModel: this.models.getUserModel(),
+                    organizationModel: this.models.getOrganizationModel(),
+                    groupsModel: this.models.getGroupsModel(),
+                    projectModel: this.models.getProjectModel(),
+                    emailClient: this.clients.getEmailClient(),
+                }),
+        );
+    }
+
     public getScimService<ScimServiceImplT>(): ScimServiceImplT {
         return this.getService('scimService');
     }
@@ -933,6 +965,18 @@ export class ServiceRepository
                     analytics: this.context.lightdashAnalytics,
                     projectParametersModel:
                         this.models.getProjectParametersModel(),
+                    projectModel: this.models.getProjectModel(),
+                }),
+        );
+    }
+
+    public getSlackService(): SlackService {
+        return this.getService(
+            'slackService',
+            () =>
+                new SlackService({
+                    slackClient: this.clients.getSlackClient(),
+                    unfurlService: this.getUnfurlService(),
                 }),
         );
     }

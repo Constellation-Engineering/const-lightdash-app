@@ -121,20 +121,25 @@ import { type UserWarehouseCredentials } from './types/userWarehouseCredentials'
 import { type ValidationResponse } from './types/validation';
 
 import type {
+    ApiAiAgentAdminConversationsResponse,
+    ApiAiAgentArtifactResponse,
     ApiAiAgentThreadCreateResponse,
+    ApiAiAgentThreadGenerateTitleResponse,
     ApiAiAgentThreadMessageCreateResponse,
     ApiAiAgentThreadMessageVizQueryResponse,
     ApiAiAgentThreadMessageVizResponse,
     ApiAiAgentThreadResponse,
-    ApiAiConversationMessages,
-    ApiAiConversations,
+    ApiAiAgentThreadSummaryListResponse,
     ApiGetUserAgentPreferencesResponse,
     ApiUpdateUserAgentPreferencesResponse,
     DecodedEmbed,
     EmbedUrl,
 } from './ee';
 import { type AnyType } from './types/any';
-import { type ApiGetProjectParametersResults } from './types/api/parameters';
+import {
+    type ApiGetProjectParametersListResults,
+    type ApiGetProjectParametersResults,
+} from './types/api/parameters';
 import { type ApiGetSpotlightTableConfig } from './types/api/spotlight';
 import { type Account } from './types/auth';
 import {
@@ -159,8 +164,9 @@ import type {
 } from './types/metricsExplorer';
 import type { ResultsPaginationMetadata } from './types/paginateResults';
 import { type ParametersValuesMap } from './types/parameters';
+import { type PivotConfiguration } from './types/pivot';
 import { type ApiPromotionChangesResponse } from './types/promotion';
-import type { QueryHistoryStatus } from './types/queryHistory';
+import { type QueryHistoryStatus } from './types/queryHistory';
 import { type ApiRenameFieldsResponse } from './types/rename';
 import { type SchedulerWithLogs } from './types/schedulerLog';
 import {
@@ -180,23 +186,23 @@ import { getFields } from './utils/fields';
 import { formatItemValue } from './utils/formatting';
 import { getItemId, getItemLabelWithoutTableName } from './utils/item';
 import { getOrganizationNameSchema } from './utils/organization';
-import type {
-    PivotIndexColum,
-    PivotValuesColumn,
-} from './visualizations/types';
+import type { PivotValuesColumn } from './visualizations/types';
 
 dayjs.extend(utc);
 export * from './authorization/index';
+export * from './authorization/roleToScopeMapping';
+export * from './authorization/scopes';
 export * from './authorization/types';
 export * from './compiler/exploreCompiler';
 export * from './compiler/filtersCompiler';
 export * from './compiler/parameters';
 export * from './compiler/translator';
+export * from './constants/pivot';
 export * from './constants/sqlRunner';
 export { default as DbtSchemaEditor } from './dbt/DbtSchemaEditor/DbtSchemaEditor';
 export * from './dbt/validation';
 export * from './ee/index';
-export * from './pivotTable/pivotQueryResults';
+export * from './pivot';
 export { default as lightdashDbtYamlSchema } from './schemas/json/lightdash-dbt-2.0.json';
 export { default as lightdashProjectConfigSchema } from './schemas/json/lightdash-project-config-1.0.json';
 export * from './templating/template';
@@ -259,10 +265,12 @@ export * from './types/queryHistory';
 export * from './types/rename';
 export * from './types/resourceViewItem';
 export * from './types/results';
+export * from './types/roles';
 export * from './types/savedCharts';
 export * from './types/scheduler';
 export * from './types/schedulerLog';
 export * from './types/schedulerTaskList';
+export * from './types/scopes';
 export * from './types/search';
 export * from './types/share';
 export * from './types/slack';
@@ -583,7 +591,7 @@ export type ReadyQueryResultsPage = ResultsPaginationMetadata<ResultRow> & {
     pivotDetails: {
         // Unlimited total column count, this is used to display a warning to the user in the frontend when the number of columns is over MAX_PIVOT_COLUMN_LIMIT
         totalColumnCount: number | null;
-        indexColumn: PivotIndexColum;
+        indexColumn: PivotConfiguration['indexColumn'] | undefined;
         valuesColumns: PivotValuesColumn[];
         groupByColumns: GroupByColumn[] | undefined;
         sortBy: SortBy | undefined;
@@ -893,8 +901,6 @@ type ApiResults =
     | ApiAiGetDashboardSummaryResponse['results']
     | ApiCatalogMetadataResults
     | ApiCatalogAnalyticsResults
-    | ApiAiConversations['results']
-    | ApiAiConversationMessages['results']
     | ApiPromotionChangesResponse['results']
     | ApiWarehouseTableFields['results']
     | ApiTogglePinnedItem['results']
@@ -934,9 +940,14 @@ type ApiResults =
     | ApiUpdateUserAgentPreferencesResponse['results']
     | ApiGetUserAgentPreferencesResponse[`results`]
     | ApiGetProjectParametersResults
+    | ApiGetProjectParametersListResults
     | ApiAiAgentThreadCreateResponse['results']
     | ApiAiAgentThreadMessageCreateResponse['results']
-    | Account;
+    | ApiAiAgentArtifactResponse['results']
+    | ApiAiAgentThreadGenerateTitleResponse['results']
+    | ApiAiAgentThreadSummaryListResponse['results']
+    | Account
+    | ApiAiAgentAdminConversationsResponse['results'];
 
 export type ApiResponse<T extends ApiResults = ApiResults> = {
     status: 'ok';
@@ -1092,6 +1103,7 @@ export type HealthState = {
         overrideColorPalette: string[] | undefined;
         overrideColorPaletteName: string | undefined;
     };
+    isCustomRolesEnabled: boolean;
 };
 
 export enum DBFieldTypes {
@@ -1112,6 +1124,7 @@ export const DbtProjectTypeLabels: Record<DbtProjectType, string> = {
     [DbtProjectType.BITBUCKET]: 'BitBucket',
     [DbtProjectType.AZURE_DEVOPS]: 'Azure DevOps',
     [DbtProjectType.NONE]: 'CLI',
+    [DbtProjectType.MANIFEST]: 'Manifest',
 };
 
 export enum CreateProjectTableConfiguration {
@@ -1410,13 +1423,15 @@ export function formatRawRows(
 export function formatRow(
     row: { [col: string]: AnyType },
     itemsMap: ItemsMap,
+    pivotValuesColumns?: Record<string, PivotValuesColumn> | null,
 ): ResultRow {
     const resultRow: ResultRow = {};
     const columnNames = Object.keys(row || {});
 
     for (const columnName of columnNames) {
         const value = row[columnName];
-        const item = itemsMap[columnName];
+        const pivotValuesColumn = pivotValuesColumns?.[columnName];
+        const item = itemsMap[pivotValuesColumn?.referenceField ?? columnName];
 
         resultRow[columnName] = {
             value: {
@@ -1432,8 +1447,9 @@ export function formatRow(
 export function formatRows(
     rows: { [col: string]: AnyType }[],
     itemsMap: ItemsMap,
+    pivotValuesColumns?: Record<string, PivotValuesColumn> | null,
 ): ResultRow[] {
-    return rows.map((row) => formatRow(row, itemsMap));
+    return rows.map((row) => formatRow(row, itemsMap, pivotValuesColumns));
 }
 
 const isObject = (object: AnyType) =>

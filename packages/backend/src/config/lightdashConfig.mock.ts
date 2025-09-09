@@ -140,6 +140,16 @@ export const lightdashConfigMock: LightdashConfig = {
         enabled: false,
         jobTimeout: 0,
         tasks: ALL_TASK_NAMES,
+        queryHistory: {
+            cleanup: {
+                enabled: true,
+                retentionDays: 30,
+                batchSize: 1000,
+                delayMs: 100,
+                maxBatches: 100,
+                schedule: '0 2 * * *',
+            },
+        },
     },
     secureCookies: false,
     sentry: {
@@ -179,7 +189,7 @@ export const lightdashConfigMock: LightdashConfig = {
         defaultLimit: 500,
         csvCellsLimit: 100000,
         timezone: undefined,
-        showQueryWarnings: false,
+        useSqlPivotResults: false,
     },
     ai: {
         copilot: {
@@ -188,11 +198,13 @@ export const lightdashConfigMock: LightdashConfig = {
             maxQueryLimit: 10000,
             telemetryEnabled: false,
             requiresFeatureFlag: false,
+            askAiButtonEnabled: false,
             defaultProvider: 'openai',
             providers: {
                 openai: {
                     apiKey: 'mock_api_key',
                     modelName: 'mock_model_name',
+                    temperature: 0.2,
                 },
             },
         },
@@ -237,5 +249,8 @@ export const lightdashConfigMock: LightdashConfig = {
     },
     mcp: {
         enabled: true,
+    },
+    customRoles: {
+        enabled: false,
     },
 };

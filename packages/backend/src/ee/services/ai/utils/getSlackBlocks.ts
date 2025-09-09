@@ -1,7 +1,6 @@
 import {
     followUpToolsSchema,
     followUpToolsText,
-    MetricQuery,
     parseVizConfig,
     SlackPrompt,
 } from '@lightdash/common';
@@ -163,6 +162,7 @@ export function getExploreBlocks(
 }
 
 export function getDeepLinkBlocks(
+    agentUuid: string,
     slackPrompt: SlackPrompt,
     siteUrl: string,
 ): (Block | KnownBlock)[] {
@@ -175,7 +175,7 @@ export function getDeepLinkBlocks(
             type: 'section',
             text: {
                 type: 'mrkdwn',
-                text: `<${siteUrl}/projects/${slackPrompt.projectUuid}/ai/conversations/${slackPrompt.threadUuid}/${slackPrompt.promptUuid}|View message data in Lightdash ⚡️>`,
+                text: `<${siteUrl}/projects/${slackPrompt.projectUuid}/ai-agents/${agentUuid}/threads/${slackPrompt.threadUuid}/messages/${slackPrompt.promptUuid}/debug|View message data in Lightdash ⚡️>`,
             },
         },
     ];

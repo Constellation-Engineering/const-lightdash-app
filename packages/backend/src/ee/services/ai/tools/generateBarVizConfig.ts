@@ -1,11 +1,14 @@
 import {
+    Explore,
     getTotalFilterRules,
     isSlackPrompt,
     toolVerticalBarArgsSchema,
     toolVerticalBarArgsSchemaTransformed,
+    ToolVerticalBarArgsTransformed,
 } from '@lightdash/common';
 import { tool } from 'ai';
 import type {
+    CreateOrUpdateArtifactFn,
     GetExploreFn,
     GetPromptFn,
     RunMiniMetricQueryFn,
@@ -16,8 +19,11 @@ import type {
 import { renderEcharts } from '../utils/renderEcharts';
 import { toolErrorHandler } from '../utils/toolErrorHandler';
 import {
+    validateCustomMetricsDefinition,
     validateFilterRules,
+    validateMetricDimensionFilterPlacement,
     validateSelectedFieldsExistence,
+    validateSortFieldsAreSelected,
 } from '../utils/validators';
 import { renderVerticalBarViz } from '../visualizations/vizVerticalBar';
 
@@ -28,6 +34,7 @@ type Dependencies = {
     getPrompt: GetPromptFn;
     updatePrompt: UpdatePromptFn;
     sendFile: SendFileFn;
+    createOrUpdateArtifact: CreateOrUpdateArtifactFn;
     maxLimit: number;
 };
 
@@ -38,12 +45,53 @@ export const getGenerateBarVizConfig = ({
     getPrompt,
     sendFile,
     updatePrompt,
+    createOrUpdateArtifact,
     maxLimit,
 }: Dependencies) => {
     const schema = toolVerticalBarArgsSchema;
 
+    /**
+     * This function is used to validate the viz tool.
+     * @param vizTool - The complete viz tool with populated custom fields
+     * @param explore - The explore
+     */
+    const validateVizTool = (
+        vizTool: ToolVerticalBarArgsTransformed,
+        explore: Explore,
+    ) => {
+        const filterRules = getTotalFilterRules(vizTool.filters);
+        const fieldsToValidate = [
+            vizTool.vizConfig.xDimension,
+            vizTool.vizConfig.breakdownByDimension,
+            ...vizTool.vizConfig.yMetrics,
+            ...vizTool.vizConfig.sorts.map((sortField) => sortField.fieldId),
+        ].filter((x) => typeof x === 'string');
+        validateSelectedFieldsExistence(
+            explore,
+            fieldsToValidate,
+            vizTool.customMetrics,
+        );
+        validateCustomMetricsDefinition(explore, vizTool.customMetrics);
+        validateFilterRules(explore, filterRules, vizTool.customMetrics);
+        validateMetricDimensionFilterPlacement(
+            explore,
+            vizTool.filters,
+            vizTool.customMetrics,
+        );
+        const selectedDimensions = [
+            vizTool.vizConfig.xDimension,
+            vizTool.vizConfig.breakdownByDimension,
+        ].filter((x) => typeof x === 'string');
+        validateSortFieldsAreSelected(
+            vizTool.vizConfig.sorts,
+            selectedDimensions,
+            vizTool.vizConfig.yMetrics,
+            vizTool.customMetrics,
+        );
+    };
+
     return tool({
-        description: `Use this tool to generate a Bar Chart Visualization.`,
+        description: toolVerticalBarArgsSchema.description,
         parameters: schema,
         execute: async (toolArgs) => {
             try {
@@ -52,24 +100,24 @@ export const getGenerateBarVizConfig = ({
                 // TODO: common for all viz tools. find a way to reuse this code.
                 const vizTool =
                     toolVerticalBarArgsSchemaTransformed.parse(toolArgs);
-
-                const filterRules = getTotalFilterRules(vizTool.filters);
                 const explore = await getExplore({
                     exploreName: vizTool.vizConfig.exploreName,
                 });
-                const fieldsToValidate = [
-                    vizTool.vizConfig.xDimension,
-                    vizTool.vizConfig.breakdownByDimension,
-                    ...vizTool.vizConfig.yMetrics,
-                    ...vizTool.vizConfig.sorts.map(
-                        (sortField) => sortField.fieldId,
-                    ),
-                ].filter((x) => typeof x === 'string');
-                validateSelectedFieldsExistence(explore, fieldsToValidate);
-                validateFilterRules(explore, filterRules);
+                validateVizTool(vizTool, explore);
                 // end of TODO
 
                 const prompt = await getPrompt();
+
+                await createOrUpdateArtifact({
+                    threadUuid: prompt.threadUuid,
+                    promptUuid: prompt.promptUuid,
+                    artifactType: 'chart',
+                    title: toolArgs.title,
+                    description: toolArgs.description,
+                    vizConfig: toolArgs,
+                });
+
+                // TODO :: keeping this for now, until the front-end is under feature-flag
                 await updatePrompt({
                     promptUuid: prompt.promptUuid,
                     vizConfigOutput: toolArgs,

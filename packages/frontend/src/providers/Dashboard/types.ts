@@ -7,7 +7,9 @@ import {
     type DashboardParameters,
     type DateGranularity,
     type FilterableDimension,
+    type ParameterDefinitions,
     type ParametersValuesMap,
+    type ParameterValue,
     type ResultColumn,
     type SortField,
 } from '@lightdash/common';
@@ -34,6 +36,10 @@ export type DashboardContextType = {
     setHaveTabsChanged: Dispatch<SetStateAction<boolean>>;
     dashboardTabs: Dashboard['tabs'];
     setDashboardTabs: Dispatch<SetStateAction<Dashboard['tabs']>>;
+    activeTab: Dashboard['tabs'][number] | undefined;
+    setActiveTab: Dispatch<
+        SetStateAction<Dashboard['tabs'][number] | undefined>
+    >;
     dashboardFilters: DashboardFilters;
     dashboardTemporaryFilters: DashboardFilters;
     allFilters: DashboardFilters;
@@ -100,9 +106,18 @@ export type DashboardContextType = {
     dashboardParameters: DashboardParameters;
     parameterValues: ParametersValuesMap;
     clearAllParameters: () => void;
-    setParameter: (key: string, value: string | string[] | null) => void;
+    setParameter: (key: string, value: ParameterValue | null) => void;
     dashboardParameterReferences: Set<string>;
     addParameterReferences: (tileUuid: string, references: string[]) => void;
     tileParameterReferences: Record<string, string[]>;
     areAllChartsLoaded: boolean;
+    parameterDefinitions: ParameterDefinitions;
+    addParameterDefinitions: (parameters: ParameterDefinitions) => void;
+    missingRequiredParameters: string[];
+    pinnedParameters: string[];
+    setPinnedParameters: (parameters: string[]) => void;
+    toggleParameterPin: (parameterKey: string) => void;
+    havePinnedParametersChanged: boolean;
+    setHavePinnedParametersChanged: Dispatch<SetStateAction<boolean>>;
+    tileNamesById: Record<string, string>;
 };

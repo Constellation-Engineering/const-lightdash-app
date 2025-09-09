@@ -39,6 +39,7 @@ import { type EchartSeriesClickEvent } from '../../SimpleChart';
 import { VisualizationConfigPortalId } from '../ExplorePanel/constants';
 import VisualizationConfig from '../VisualizationCard/VisualizationConfig';
 import { SeriesContextMenu } from './SeriesContextMenu';
+import VisualizationWarning from './VisualizationWarning';
 
 export type EchartsClickEvent = {
     event: EchartSeriesClickEvent;
@@ -130,6 +131,23 @@ const VisualizationCard: FC<Props> = memo(({ projectUuid: fallBackUUid }) => {
         (context) => context.actions.closeVisualizationConfig,
     );
 
+    const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
+
+    useLayoutEffect(() => {
+        if (isVisualizationConfigOpen) {
+            const target = document.getElementById(VisualizationConfigPortalId);
+            setPortalTarget(target);
+        } else {
+            setPortalTarget(null);
+        }
+    }, [isVisualizationConfigOpen]);
+
+    useLayoutEffect(() => {
+        if (!isEditMode) {
+            closeVisualizationConfig();
+        }
+    }, [isEditMode, closeVisualizationConfig]);
+
     useLayoutEffect(() => {
         if (!isOpen) {
             closeVisualizationConfig();
@@ -207,6 +225,7 @@ const VisualizationCard: FC<Props> = memo(({ projectUuid: fallBackUUid }) => {
                 initialPivotDimensions={
                     unsavedChartVersion.pivotConfig?.columns
                 }
+                unsavedMetricQuery={unsavedChartVersion.metricQuery}
                 resultsData={resultsData}
                 apiErrorDetail={apiErrorDetail}
                 isLoading={isLoadingQueryResults}
@@ -226,6 +245,18 @@ const VisualizationCard: FC<Props> = memo(({ projectUuid: fallBackUUid }) => {
                     isOpen={isOpen}
                     isVisualizationCard
                     onToggle={toggleSection}
+                    headerElement={
+                        isOpen && (
+                            <VisualizationWarning
+                                pivotDimensions={
+                                    unsavedChartVersion.pivotConfig?.columns
+                                }
+                                chartConfig={unsavedChartVersion.chartConfig}
+                                resultsData={resultsData}
+                                isLoading={isLoadingQueryResults}
+                            />
+                        )
+                    }
                     rightHeaderElement={
                         isOpen && (
                             <>
@@ -239,7 +270,6 @@ const VisualizationCard: FC<Props> = memo(({ projectUuid: fallBackUUid }) => {
                                         }
                                         rightIcon={
                                             <MantineIcon
-                                                color="gray"
                                                 icon={
                                                     isVisualizationConfigOpen
                                                         ? IconLayoutSidebarLeftCollapse
@@ -258,7 +288,7 @@ const VisualizationCard: FC<Props> = memo(({ projectUuid: fallBackUUid }) => {
                                  * NOTE: not using Portal from mantine-8 because this page lacks MantineProvider from Mantine 8
                                  * TODO: use mantine-8 portal with reuseTargetNode flag to avoid rendering additional divs
                                  */}
-                                {isVisualizationConfigOpen &&
+                                {portalTarget &&
                                     createPortal(
                                         <VisualizationConfig
                                             chartType={
@@ -267,9 +297,7 @@ const VisualizationCard: FC<Props> = memo(({ projectUuid: fallBackUUid }) => {
                                             }
                                             onClose={closeVisualizationConfig}
                                         />,
-                                        document.getElementById(
-                                            VisualizationConfigPortalId,
-                                        )!,
+                                        portalTarget,
                                     )}
 
                                 <Can

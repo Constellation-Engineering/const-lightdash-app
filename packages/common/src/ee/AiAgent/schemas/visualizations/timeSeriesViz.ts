@@ -5,6 +5,7 @@ import type { AiMetricQueryWithFilters } from '../../types';
 import { getValidAiQueryLimit } from '../../validators';
 import { getFieldIdSchema } from '../fieldId';
 import sortFieldSchema from '../sortField';
+import type { ToolTimeSeriesArgsTransformed } from '../tools';
 
 export const timeSeriesMetricVizConfigSchema = z.object({
     exploreName: z
@@ -55,11 +56,17 @@ export type TimeSeriesMetricVizConfigSchemaType = z.infer<
     typeof timeSeriesMetricVizConfigSchema
 >;
 
-export const metricQueryTimeSeriesViz = (
-    vizConfig: TimeSeriesMetricVizConfigSchemaType,
-    filters: Filters,
-    maxLimit: number,
-): AiMetricQueryWithFilters => {
+export const metricQueryTimeSeriesViz = ({
+    vizConfig,
+    filters,
+    maxLimit,
+    customMetrics,
+}: {
+    vizConfig: TimeSeriesMetricVizConfigSchemaType;
+    filters: Filters;
+    maxLimit: number;
+    customMetrics: ToolTimeSeriesArgsTransformed['customMetrics'] | null;
+}): AiMetricQueryWithFilters => {
     const metrics = vizConfig.yMetrics;
     const dimensions = [
         vizConfig.xDimension,
@@ -73,8 +80,12 @@ export const metricQueryTimeSeriesViz = (
         metrics,
         dimensions,
         limit: getValidAiQueryLimit(limit, maxLimit),
-        sorts,
+        sorts: sorts.map((sort) => ({
+            ...sort,
+            nullsFirst: sort.nullsFirst ?? undefined,
+        })),
         exploreName: vizConfig.exploreName,
         filters,
+        additionalMetrics: customMetrics ?? [],
     };
 };

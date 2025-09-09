@@ -11,10 +11,12 @@ import {
     type DownloadOptions,
     type ExecuteAsyncMetricQueryRequestParams,
     type ExecuteAsyncSavedChartRequestParams,
+    FeatureFlags,
     MAX_SAFE_INTEGER,
     type MetricQuery,
     ParameterError,
     type ParametersValuesMap,
+    type PivotConfiguration,
     QueryExecutionContext,
     QueryHistoryStatus,
     type ReadyQueryResultsPage,
@@ -26,6 +28,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { lightdashApi } from '../api';
 import { pollForResults } from '../features/queryRunner/executeQuery';
 import { convertDateFilters } from '../utils/dateFilter';
+import { useFeatureFlag } from './useFeatureFlagEnabled';
 import useQueryError from './useQueryError';
 
 export type QueryResultsProps = {
@@ -39,6 +42,8 @@ export type QueryResultsProps = {
     context?: string;
     invalidateCache?: boolean;
     parameters?: ParametersValuesMap;
+    pivotConfiguration?: PivotConfiguration;
+    pivotResults?: boolean;
 };
 
 /**
@@ -113,6 +118,7 @@ const executeAsyncQuery = (
                 limit: data.csvLimit,
                 invalidateCache: data.invalidateCache,
                 parameters: data.parameters,
+                pivotResults: data.pivotResults,
             },
             { signal },
         );
@@ -125,6 +131,7 @@ const executeAsyncQuery = (
                 limit: data.csvLimit,
                 invalidateCache: data.invalidateCache,
                 parameters: data.parameters,
+                pivotResults: data.pivotResults,
             },
             { signal },
         );
@@ -157,6 +164,7 @@ const executeAsyncQuery = (
                 },
                 invalidateCache: true, // Note: do not cache explore queries
                 parameters: data.parameters,
+                pivotConfiguration: data.pivotConfiguration,
             },
             { signal },
         );
@@ -202,12 +210,30 @@ export const useGetReadyQueryResults = (
         return missingRequiredParameters.length === 0;
     }, [data, missingRequiredParameters]);
 
+    const { data: useSqlPivotResults } = useFeatureFlag(
+        FeatureFlags.UseSqlPivotResults,
+    );
+
     const result = useQuery<ApiExecuteAsyncMetricQueryResults, ApiError>({
         enabled: isEnabled,
-        queryKey: ['create-query', data, missingRequiredParameters],
+        queryKey: [
+            'create-query',
+            data,
+            missingRequiredParameters,
+            useSqlPivotResults,
+        ],
         keepPreviousData: true, // needed to keep the last metric query which could break cartesian chart config
         queryFn: ({ signal }) => {
-            return executeAsyncQuery(data, signal);
+            return executeAsyncQuery(
+                data
+                    ? {
+                          ...data,
+                          pivotResults:
+                              data.pivotResults ?? useSqlPivotResults?.enabled,
+                      }
+                    : null,
+                signal,
+            );
         },
     });
 
@@ -251,7 +277,10 @@ const getResultsPage = async (
 export type InfiniteQueryResults = Partial<
     Pick<
         ReadyQueryResultsPage,
-        'queryUuid' | 'totalResults' | 'initialQueryExecutionMs'
+        | 'queryUuid'
+        | 'totalResults'
+        | 'initialQueryExecutionMs'
+        | 'pivotDetails'
     >
 > & {
     projectUuid?: string;
@@ -300,6 +329,10 @@ export const useInfiniteQueryResults = (
 
     const prevQueryUuidRef = useRef<string | undefined>(null);
     const prevProjectUuidRef = useRef<string | undefined>(null);
+    // Detect input changes during render to avoid exposing stale data
+    const dependenciesChanged =
+        projectUuid !== prevProjectUuidRef.current ||
+        queryUuid !== prevQueryUuidRef.current;
 
     const fetchMoreRows = useCallback(() => {
         const lastPage = fetchedPages[fetchedPages.length - 1];
@@ -330,9 +363,10 @@ export const useInfiniteQueryResults = (
         const isFetchingPage = fetchArgs.page > fetchedPages.length;
 
         return (
-            !!projectUuid &&
-            !!queryUuid &&
-            (isFetchingPage || (fetchAll && !hasFetchedAllRows))
+            (!!projectUuid &&
+                !!queryUuid &&
+                (isFetchingPage || (fetchAll && !hasFetchedAllRows))) ||
+            dependenciesChanged
         );
     }, [
         fetchedPages,
@@ -341,6 +375,7 @@ export const useInfiniteQueryResults = (
         queryUuid,
         fetchAll,
         hasFetchedAllRows,
+        dependenciesChanged,
     ]);
 
     const queryClient = useQueryClient();
@@ -498,19 +533,21 @@ export const useInfiniteQueryResults = (
         () => ({
             projectUuid,
             queryUuid,
-            queryStatus: nextPageData?.status, // show latest status
+            queryStatus: dependenciesChanged ? undefined : nextPageData?.status, // show latest status
             totalResults: fetchedPages[0]?.totalResults,
             initialQueryExecutionMs: fetchedPages[0]?.initialQueryExecutionMs,
+            pivotDetails: fetchedPages[0]?.pivotDetails,
             hasFetchedAllRows,
             rows: fetchedRows,
             isFetchingRows,
             fetchMoreRows,
             setFetchAll,
             totalClientFetchTimeMs,
-            isInitialLoading,
+            isInitialLoading: isInitialLoading || dependenciesChanged,
             isFetchingFirstPage:
                 !!queryUuid &&
-                (fetchedPages[0]?.totalResults === undefined ||
+                (dependenciesChanged ||
+                    fetchedPages[0]?.totalResults === undefined ||
                     (fetchedPages[0]?.totalResults > 0 &&
                         fetchedRows.length === 0)),
             isFetchingAllPages: !!queryUuid && fetchAll && !hasFetchedAllRows,
@@ -530,6 +567,7 @@ export const useInfiniteQueryResults = (
             fetchAll,
             nextPageData,
             nextPage.error,
+            dependenciesChanged,
         ],
     );
 };

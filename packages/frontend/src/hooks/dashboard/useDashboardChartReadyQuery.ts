@@ -1,4 +1,6 @@
 import {
+    FeatureFlags,
+    getAvailableParametersFromTables,
     getDimensions,
     getItemId,
     isDateItem,
@@ -15,6 +17,7 @@ import { lightdashApi } from '../../api';
 import useDashboardContext from '../../providers/Dashboard/useDashboardContext';
 import { convertDateDashboardFilters } from '../../utils/dateFilter';
 import { useExplore } from '../useExplore';
+import { useFeatureFlag } from '../useFeatureFlagEnabled';
 import { useSavedQuery } from '../useSavedQuery';
 import useSearchParams from '../useSearchParams';
 import useDashboardFiltersForTile from './useDashboardFiltersForTile';
@@ -62,6 +65,9 @@ export const useDashboardChartReadyQuery = (
     const setChartsWithDateZoomApplied = useDashboardContext(
         (c) => c.setChartsWithDateZoomApplied,
     );
+    const addParameterDefinitions = useDashboardContext(
+        (c) => c.addParameterDefinitions,
+    );
 
     const sortKey =
         dashboardSorts
@@ -77,6 +83,14 @@ export const useDashboardChartReadyQuery = (
     const { data: explore } = useExplore(
         chartQuery.data?.metricQuery?.exploreName,
     );
+
+    useEffect(() => {
+        if (explore) {
+            addParameterDefinitions(
+                getAvailableParametersFromTables(Object.values(explore.tables)),
+            );
+        }
+    }, [explore, addParameterDefinitions]);
 
     const timezoneFixFilters =
         dashboardFilters && convertDateDashboardFilters(dashboardFilters);
@@ -119,6 +133,10 @@ export const useDashboardChartReadyQuery = (
         return prev;
     });
 
+    const { data: useSqlPivotResults } = useFeatureFlag(
+        FeatureFlags.UseSqlPivotResults,
+    );
+
     const queryKey = useMemo(
         () => [
             'dashboard_chart_ready_query',
@@ -133,6 +151,7 @@ export const useDashboardChartReadyQuery = (
             hasADateDimension ? granularity : null,
             invalidateCache,
             chartParameterValues,
+            useSqlPivotResults,
         ],
         [
             chartQuery.data?.projectUuid,
@@ -147,6 +166,7 @@ export const useDashboardChartReadyQuery = (
             granularity,
             invalidateCache,
             chartParameterValues,
+            useSqlPivotResults,
         ],
     );
 
@@ -172,6 +192,7 @@ export const useDashboardChartReadyQuery = (
                     },
                     invalidateCache,
                     parameters: parameterValues,
+                    pivotResults: useSqlPivotResults?.enabled,
                 },
             );
 

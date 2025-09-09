@@ -5,6 +5,7 @@ import { type Explore, type ExploreError } from './explore';
 import { type DashboardFilterRule, type DashboardFilters } from './filter';
 import { type KnexPaginatedData } from './knex-paginate';
 import { type MetricQuery } from './metricQuery';
+import { type ParametersValuesMap } from './parameters';
 import { type PivotConfig } from './pivot';
 import { type DateGranularity } from './timeFrames';
 import { type ValidationTarget } from './validation';
@@ -12,6 +13,7 @@ import { type ValidationTarget } from './validation';
 export type SchedulerCsvOptions = {
     formatted: boolean;
     limit: 'table' | 'all' | number;
+    asAttachment?: boolean;
 };
 
 export type SchedulerImageOptions = {
@@ -123,16 +125,13 @@ export const isDashboardScheduler = (
     scheduler: Scheduler | CreateSchedulerAndTargets,
 ): scheduler is DashboardScheduler => scheduler.dashboardUuid !== undefined;
 
-export type SchedulerFilterRule = DashboardFilterRule & {
-    tileTargets: undefined;
-};
-
 export type DashboardScheduler = SchedulerBase & {
     savedChartUuid: null;
     dashboardUuid: string;
-    filters?: SchedulerFilterRule[];
+    filters?: DashboardFilterRule[];
+    parameters?: ParametersValuesMap;
     customViewportWidth?: number;
-    selectedTabs?: string[];
+    selectedTabs: string[] | null;
 };
 
 export type Scheduler = ChartScheduler | DashboardScheduler;
@@ -236,7 +235,10 @@ export type UpdateSchedulerAndTargets = Pick<
     | 'notificationFrequency'
     | 'includeLinks'
 > &
-    Pick<DashboardScheduler, 'filters' | 'customViewportWidth'> & {
+    Pick<
+        DashboardScheduler,
+        'filters' | 'parameters' | 'customViewportWidth'
+    > & {
         targets: Array<
             | CreateSchedulerTarget
             | UpdateSchedulerSlackTarget

@@ -99,6 +99,8 @@ data/
 
 .local/*
 
+CLAUDE.local.md
+
 # SAM / AWS infra
 .aws-sam/
 packaged.yaml

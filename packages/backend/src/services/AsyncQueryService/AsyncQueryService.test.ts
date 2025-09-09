@@ -11,7 +11,7 @@ import {
     type QueryHistory,
     type ResultColumns,
 } from '@lightdash/common';
-import type { SshTunnel } from '@lightdash/warehouses';
+import { type SshTunnel } from '@lightdash/warehouses';
 import { Readable } from 'stream';
 import { analyticsMock } from '../../analytics/LightdashAnalytics.mock';
 import type { S3CacheClient } from '../../clients/Aws/S3CacheClient';
@@ -45,7 +45,7 @@ import type { UserWarehouseCredentialsModel } from '../../models/UserWarehouseCr
 import type { WarehouseAvailableTablesModel } from '../../models/WarehouseAvailableTablesModel/WarehouseAvailableTablesModel';
 import type { SchedulerClient } from '../../scheduler/SchedulerClient';
 import type { EncryptionUtil } from '../../utils/EncryptionUtil/EncryptionUtil';
-import { warehouseClientMock } from '../../utils/QueryBuilder/queryBuilder.mock';
+import { warehouseClientMock } from '../../utils/QueryBuilder/MetricQueryBuilder.mock';
 import type { ICacheService } from '../CacheService/ICacheService';
 import { CacheHitCacheResult, MissCacheResult } from '../CacheService/types';
 import { PivotTableService } from '../PivotTableService/PivotTableService';
@@ -77,6 +77,7 @@ const mockSshTunnel = {
 } as unknown as SshTunnel<CreateWarehouseCredentials>;
 
 jest.mock('@lightdash/warehouses', () => ({
+    ...jest.requireActual('@lightdash/warehouses'),
     SshTunnel: jest.fn(() => mockSshTunnel),
 }));
 
@@ -856,8 +857,8 @@ describe('AsyncQueryService', () => {
                 sortBy: [],
             };
 
-            const mockPivotValuesColumns = [
-                {
+            const mockPivotValuesColumns = {
+                amount_sum_2021: {
                     referenceField: 'amount',
                     pivotColumnName: 'amount_sum_2021',
                     aggregation: VizAggregationOptions.SUM,
@@ -865,7 +866,7 @@ describe('AsyncQueryService', () => {
                         { referenceField: 'order_date', value: '2021' },
                     ],
                 },
-            ];
+            };
 
             const mockQueryHistory: QueryHistory = {
                 createdAt: new Date(),
@@ -939,7 +940,7 @@ describe('AsyncQueryService', () => {
             expect(result).toMatchObject({
                 pivotDetails: {
                     totalColumnCount: 5,
-                    valuesColumns: mockPivotValuesColumns,
+                    valuesColumns: Object.values(mockPivotValuesColumns),
                     indexColumn: mockPivotConfiguration.indexColumn,
                     groupByColumns: mockPivotConfiguration.groupByColumns,
                     sortBy: mockPivotConfiguration.sortBy,

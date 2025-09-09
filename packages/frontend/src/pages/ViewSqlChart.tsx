@@ -1,4 +1,8 @@
-import { getParameterReferences, isVizTableConfig } from '@lightdash/common';
+import {
+    getParameterReferences,
+    isVizTableConfig,
+    type ParameterValue,
+} from '@lightdash/common';
 import {
     Box,
     Group,
@@ -19,7 +23,7 @@ import { ConditionalVisibility } from '../components/common/ConditionalVisibilit
 import ErrorState from '../components/common/ErrorState';
 import MantineIcon from '../components/common/MantineIcon';
 import Page from '../components/common/Page/Page';
-import { Parameters } from '../features/parameters';
+import { Parameters, useParameters } from '../features/parameters';
 import { ChartDownload } from '../features/sqlRunner/components/Download/ChartDownload';
 import ResultsDownloadButton from '../features/sqlRunner/components/Download/ResultsDownloadButton';
 import { Header } from '../features/sqlRunner/components/Header';
@@ -73,7 +77,7 @@ const ViewSqlChart = () => {
     });
 
     const handleParameterChange = useCallback(
-        (key: string, value: string | string[] | null) => {
+        (key: string, value: ParameterValue | null) => {
             dispatch(updateParameterValue({ key, value }));
         },
         [dispatch],
@@ -96,6 +100,15 @@ const ViewSqlChart = () => {
             dispatch(setProjectUuid(params.projectUuid));
         }
     }, [dispatch, chartData, params.projectUuid]);
+
+    const {
+        data: projectParameters,
+        isLoading: isProjectParametersLoading,
+        isError: isProjectParametersError,
+    } = useParameters(
+        params.projectUuid,
+        Array.from(parameterReferences ?? []),
+    );
 
     return (
         <Page
@@ -155,10 +168,12 @@ const ViewSqlChart = () => {
                         <Group position="apart">
                             <Parameters
                                 isEditMode={false}
-                                parameterReferences={parameterReferences}
+                                parameters={projectParameters}
                                 parameterValues={parameterValues}
                                 onParameterChange={handleParameterChange}
                                 onClearAll={clearAllParameters}
+                                isLoading={isProjectParametersLoading}
+                                isError={isProjectParametersError}
                             />
                             {(activeTab === TabOption.RESULTS ||
                                 (activeTab === TabOption.CHART &&
